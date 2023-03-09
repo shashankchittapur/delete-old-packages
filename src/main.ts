@@ -1,18 +1,45 @@
+/* eslint-disable sort-imports */
+/* eslint-disable prettier/prettier */
 import * as core from '@actions/core'
-import {wait} from './wait'
+import { listPackageNamesForRepo, deletePackages, PackageInfo } from './listpackages'
+import { RestEndpointMethodTypes } from '@octokit/plugin-rest-endpoint-methods/dist-types/generated/parameters-and-response-types'
+
+
+export type PackageType =
+  RestEndpointMethodTypes['packages']['listPackagesForOrganization']['parameters']['package_type']
+export interface Inputs {
+  orgName: string
+  token: string
+  repoName: string
+  packageType: PackageType
+  dryrun: string
+}
 
 async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
-    core.debug(`Waiting ${ms} milliseconds ...`) // debug is only output if you set the secret `ACTIONS_STEP_DEBUG` to true
-
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
-
-    core.setOutput('time', new Date().toTimeString())
+    const inputs: Inputs = {
+      orgName: core.getInput("org-name"),
+      token: core.getInput("token"),
+      repoName: core.getInput("repo-name"),
+      packageType: core.getInput("package-type") as PackageType,
+      dryrun: core.getInput("dry-run")
+    }
+    core.debug(`Input:${inputs}`)
+    const packagesAndVersions = await listPackageNamesForRepo(inputs)
+    if (inputs.dryrun === "true") {
+      core.setOutput("packages-to-delete", packagesAndVersions)
+    } else {
+      const packageInfo: PackageInfo = await deletePackages(packagesAndVersions, inputs)
+      core.info(`Total number of packages deleted ${packageInfo.packagesDeleted.keys.length}`)
+      core.info(`Total number of packages not deleted ${packageInfo.packagesNotDeleted.keys.length}`)
+      core.setOutput("packages-deleted", packageInfo.packagesDeleted)
+      core.setOutput("packages-not-deleted", packageInfo.packagesNotDeleted)
+    }
   } catch (error) {
-    if (error instanceof Error) core.setFailed(error.message)
+    if (error instanceof Error) {
+      core.debug(error.message)
+      core.setFailed(error.message)
+    }
   }
 }
 
