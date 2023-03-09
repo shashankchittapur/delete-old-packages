@@ -47,7 +47,12 @@ export async function listPackageNamesForRepo(inputs: Inputs): Promise<Map<strin
         )
         core.debug(`Versions count for package ${pkg} is ${versions.length}`)
         const snapShortVersions = versions
-            .filter(version => version.name.includes("SNAPSHOT"))
+            .filter(version => version.name.includes("SNAPSHOT") && version.name.includes("PR"))
+            .filter(version => {
+                const diff = Math.abs(new Date(version.created_at).getTime() - new Date().getTime())
+                const diffInDays = Math.ceil(diff / (1000 * 3600 * 24))
+                return diffInDays > 4
+            })
             .map(version => version.id)
 
         core.debug(`Package Name: ${pkg} Versions:${snapShortVersions}`)
