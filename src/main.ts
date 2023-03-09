@@ -29,11 +29,15 @@ async function run(): Promise<void> {
     if (inputs.dryrun === "true") {
       core.setOutput("packages-to-delete", packagesAndVersions)
     } else {
-      const packageInfo: PackageInfo = await deletePackages(packagesAndVersions, inputs)
-      core.info(`Total number of packages deleted ${packageInfo.packagesDeleted.keys.length}`)
-      core.info(`Total number of packages not deleted ${packageInfo.packagesNotDeleted.keys.length}`)
-      core.setOutput("packages-deleted", packageInfo.packagesDeleted)
-      core.setOutput("packages-not-deleted", packageInfo.packagesNotDeleted)
+      if (packagesAndVersions.keys.length > 0) {
+        const packageInfo: PackageInfo = await deletePackages(packagesAndVersions, inputs)
+        core.info(`Total number of packages deleted ${packageInfo.packagesDeleted.keys.length}`)
+        core.info(`Total number of packages not deleted ${packageInfo.packagesNotDeleted.keys.length}`)
+        core.setOutput("packages-deleted", packageInfo.packagesDeleted)
+        core.setOutput("packages-not-deleted", packageInfo.packagesNotDeleted)
+      } else {
+        core.info(`There are no packages to delete`)
+      }
     }
   } catch (error) {
     if (error instanceof Error) {
