@@ -1,18 +1,36 @@
+/* eslint-disable prettier/prettier */
 import * as core from '@actions/core'
-import {wait} from './wait'
+import { listPackageNamesForRepo } from './listpackages'
+
+export interface Inputs {
+  orgName: string
+  token: string
+  repoName: string
+  packageType: string
+}
 
 async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
-    core.debug(`Waiting ${ms} milliseconds ...`) // debug is only output if you set the secret `ACTIONS_STEP_DEBUG` to true
+    const inputs: Inputs = {
+      orgName: core.getInput("org-name"),
+      token: core.getInput("token"),
+      repoName: core.getInput("repo-name"),
+      packageType: core.getInput("package-type")
+    }
+    core.debug(`Input:${inputs}`)
+    const packagesAndVersions = await listPackageNamesForRepo(inputs)
 
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
 
-    core.setOutput('time', new Date().toTimeString())
+    for (const packageName of packagesAndVersions.keys()) {
+      const versionCommaSeparated = packagesAndVersions.get(packageName)
+      core.debug(`Package Name: ${packageName} With Versions: ${versionCommaSeparated}`)
+    }
+
   } catch (error) {
-    if (error instanceof Error) core.setFailed(error.message)
+    if (error instanceof Error) {
+      core.debug(error.message)
+      core.setFailed(error.message)
+    }
   }
 }
 
