@@ -17,6 +17,9 @@ inputs:
   dry-run:
     description: Dry run to check what packages are getting deleted
     required: true
+  days-old:
+    description: Number of days old package to delete
+    required: true
 
 runs:
   using: "node16"

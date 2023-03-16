@@ -65,11 +65,17 @@ function listPackageNamesForRepo(inputs) {
             const versions = yield octakit.paginate(octakit.rest.packages.getAllPackageVersionsForPackageOwnedByOrg, params);
             core.debug(`Versions count for package ${pkg} is ${versions.length}`);
             const snapShortVersions = versions
-                .filter(version => version.name.includes("SNAPSHOT"))
+                .filter(version => version.name.includes("SNAPSHOT") && version.name.includes("PR"))
+                .filter(version => {
+                const diff = Math.abs(new Date(version.created_at).getTime() - new Date().getTime());
+                const diffInDays = Math.ceil(diff / (1000 * 3600 * 24));
+                return diffInDays > inputs.days;
+            })
                 .map(version => version.id);
             core.debug(`Package Name: ${pkg} Versions:${snapShortVersions}`);
             packageAndVersions.set(pkg, snapShortVersions);
         }
+        core.debug(`Package And version Map ${packageAndVersions} With keys length ${packageAndVersions.size}`);
         return packageAndVersions;
     });
 }
@@ -83,23 +89,44 @@ function deletePackages(packageNameAndVersionsMap, inputs) {
             const versions = packageNameAndVersionsMap.get(packageName);
             const deletedVersions = [];
             const nonDeletedVersions = [];
+            core.info(`Package ${packageName} Versions ${versions} are ready to delete`);
             if (versions) {
-                for (const version of versions) {
+                if (Array.isArray(versions)) {
+                    for (const version of versions) {
+                        const params = {
+                            package_name: packageName,
+                            org: inputs.orgName,
+                            package_version_id: version,
+                            package_type: inputs.packageType
+                        };
+                        core.info(`Deleting package ${packageName} with version ${version}`);
+                        const response = yield octakit.rest.packages.deletePackageVersionForOrg(params);
+                        if (response && response.status === 204) {
+                            core.debug(`Package ${packageName} with version ${version} deleted`);
+                            deletedVersions.push(version);
+                        }
+                        else {
+                            core.debug(`Package ${packageName} with version ${version} not deleted`);
+                            nonDeletedVersions.push(version);
+                        }
+                    }
+                }
+                else {
                     const params = {
                         package_name: packageName,
                         org: inputs.orgName,
-                        package_version_id: version,
+                        package_version_id: versions,
                         package_type: inputs.packageType
                     };
-                    core.info(`Deleting package ${packageName} with version ${version}`);
+                    core.info(`Deleting package ${packageName} with version ${versions}`);
                     const response = yield octakit.rest.packages.deletePackageVersionForOrg(params);
                     if (response && response.status === 204) {
-                        core.debug(`Package ${packageName} with version ${version} deleted`);
-                        deletedVersions.push(version);
+                        core.debug(`Package ${packageName} with version ${versions} deleted`);
+                        deletedVersions.push(versions);
                     }
                     else {
-                        core.debug(`Package ${packageName} with version ${version} not deleted`);
-                        nonDeletedVersions.push(version);
+                        core.debug(`Package ${packageName} with version ${versions} not deleted`);
+                        nonDeletedVersions.push(versions);
                     }
                 }
             }
@@ -166,7 +193,8 @@ function run() {
                 token: core.getInput("token"),
                 repoName: core.getInput("repo-name"),
                 packageType: core.getInput("package-type"),
-                dryrun: core.getInput("dry-run")
+                dryrun: core.getInput("dry-run"),
+                days: Number(core.getInput("days-old"))
             };
             core.debug(`Input:${inputs}`);
             const packagesAndVersions = yield listpackages_1.listPackageNamesForRepo(inputs);
@@ -174,11 +202,16 @@ function run() {
                 core.setOutput("packages-to-delete", packagesAndVersions);
             }
             else {
-                const packageInfo = yield listpackages_1.deletePackages(packagesAndVersions, inputs);
-                core.info(`Total number of packages deleted ${packageInfo.packagesDeleted.keys.length}`);
-                core.info(`Total number of packages not deleted ${packageInfo.packagesNotDeleted.keys.length}`);
-                core.setOutput("packages-deleted", packageInfo.packagesDeleted);
-                core.setOutput("packages-not-deleted", packageInfo.packagesNotDeleted);
+                if (packagesAndVersions.size > 0) {
+                    const packageInfo = yield listpackages_1.deletePackages(packagesAndVersions, inputs);
+                    core.info(`Total number of packages deleted ${packageInfo.packagesDeleted.size}`);
+                    core.info(`Total number of packages not deleted ${packageInfo.packagesNotDeleted.size}`);
+                    core.setOutput("packages-deleted", packageInfo.packagesDeleted);
+                    core.setOutput("packages-not-deleted", packageInfo.packagesNotDeleted);
+                }
+                else {
+                    core.info(`There are no packages to delete`);
+                }
             }
         }
         catch (error) {
