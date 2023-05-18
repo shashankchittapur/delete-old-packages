@@ -91,7 +91,7 @@ function deletePackages(packageNameAndVersionsMap, inputs) {
             const nonDeletedVersions = [];
             core.info(`Package ${packageName} Versions ${versions} are ready to delete`);
             if (versions) {
-                if (Array.isArray(versions)) {
+                if (Array.isArray(versions) && versions.length > 1) {
                     for (const version of versions) {
                         const params = {
                             package_name: packageName,
@@ -109,24 +109,6 @@ function deletePackages(packageNameAndVersionsMap, inputs) {
                             core.debug(`Package ${packageName} with version ${version} not deleted`);
                             nonDeletedVersions.push(version);
                         }
-                    }
-                }
-                else {
-                    const params = {
-                        package_name: packageName,
-                        org: inputs.orgName,
-                        package_version_id: versions,
-                        package_type: inputs.packageType
-                    };
-                    core.info(`Deleting package ${packageName} with version ${versions}`);
-                    const response = yield octakit.rest.packages.deletePackageVersionForOrg(params);
-                    if (response && response.status === 204) {
-                        core.debug(`Package ${packageName} with version ${versions} deleted`);
-                        deletedVersions.push(versions);
-                    }
-                    else {
-                        core.debug(`Package ${packageName} with version ${versions} not deleted`);
-                        nonDeletedVersions.push(versions);
                     }
                 }
             }

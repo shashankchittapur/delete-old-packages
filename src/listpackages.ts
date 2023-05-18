@@ -74,7 +74,7 @@ export async function deletePackages(packageNameAndVersionsMap: Map<string, numb
         const nonDeletedVersions: number[] = []
         core.info(`Package ${packageName} Versions ${versions} are ready to delete`)
         if (versions) {
-            if (Array.isArray(versions)) {
+            if (Array.isArray(versions) && versions.length > 1) {
                 for (const version of versions) {
                     const params = {
                         package_name: packageName,
@@ -92,24 +92,7 @@ export async function deletePackages(packageNameAndVersionsMap: Map<string, numb
                         nonDeletedVersions.push(version)
                     }
                 }
-            } else {
-                const params = {
-                    package_name: packageName,
-                    org: inputs.orgName,
-                    package_version_id: versions,
-                    package_type: inputs.packageType
-                }
-                core.info(`Deleting package ${packageName} with version ${versions}`)
-                const response = await octakit.rest.packages.deletePackageVersionForOrg(params)
-                if (response && response.status === 204) {
-                    core.debug(`Package ${packageName} with version ${versions} deleted`)
-                    deletedVersions.push(versions)
-                } else {
-                    core.debug(`Package ${packageName} with version ${versions} not deleted`)
-                    nonDeletedVersions.push(versions)
-                }
             }
-
         }
         if (deletedVersions.length > 0) packagesDeleted.set(packageName, deletedVersions)
         if (nonDeletedVersions.length > 0) packagesNotDeleted.set(packageName, nonDeletedVersions)
